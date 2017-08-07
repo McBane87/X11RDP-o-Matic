@@ -56,6 +56,12 @@ LINE="----------------------------------------------------------------------"
 : ${GH_BRANCH:=master}
 GH_URL=https://github.com/${GH_ACCOUNT}/${GH_PROJECT}.git
 
+# xorgxrdp repository
+: ${GH_XO_ACCOUNT:=neutrinolabs}
+: ${GH_XO_PROJECT:=xorgxrdp}
+: ${GH_XO_BRANCH:=master}
+GH_XO_URL=https://github.com/${GH_XO_ACCOUNT}/${GH_XO_PROJECT}.git
+
 # working directories and logs
 WRKDIR=$(mktemp --directory --suffix .X11RDP-o-Matic)
 BASEDIR=$(dirname $(readlink -f $0))
@@ -68,7 +74,7 @@ SUDO_LOG=${WRKDIR}/sudo.log
 
 # packages to run this utility
 META_DEPENDS=(lsb-release rsync git build-essential dh-make wget gdebi)
-XRDP_CONFIGURE_ARGS=(--prefix=/usr --sysconfdir=/etc --localstatedir=/var --enable-fuse --enable-jpeg --enable-opus)
+XRDP_CONFIGURE_ARGS=(--disable-ipv6) # Inside debian/rules.in
 XRDP_BUILD_DEPENDS=(debhelper autoconf automake dh-systemd libfuse-dev libjpeg-dev libopus-dev libpam0g-dev libssl-dev libtool libx11-dev libxfixes-dev libxrandr-dev pkg-config)
 X11RDP_BUILD_DEPENDS=(autoconf automake libtool flex bison python-libxml2 libxml2-dev gettext intltool xsltproc make gcc g++ xutils-dev xutils)
 XORGXRDP_BUILD_DEPENDS=(automake autoconf libtool pkg-config nasm xserver-xorg-dev)
@@ -286,6 +292,7 @@ OPTIONS
       echo "Using branch ==>> ${GH_BRANCH} <<=="
       if [ "$GH_BRANCH" = "devel" ]
       then
+        GH_XO_BRANCH="devel"   
         echo "Note : using the bleeding-edge version may result in problems :)"
       fi
       echo $LINE
@@ -343,11 +350,21 @@ clone()
 
   if [ ! -d "$CLONE_DEST" ]; then
     if $GIT_USE_HTTPS; then
+      #xrdp
       git clone ${GH_URL} --branch ${GH_BRANCH} ${CLONE_DEST} >> $BUILD_LOG 2>&1 || error_exit
       sed -i -e 's|git://|https://|' ${CLONE_DEST}/.gitmodules ${CLONE_DEST}/.git/config
       (cd $CLONE_DEST && git submodule update --init --recursive) >> $BUILD_LOG 2>&1
+
+      #xorgxrdp
+      git clone ${GH_XO_URL} --branch ${GH_XO_BRANCH} ${CLONE_DEST}/xorgxrdp >> $BUILD_LOG 2>&1 || error_exit
+      sed -i -e 's|git://|https://|' ${CLONE_DEST}/xorgxrdp/.gitmodules ${CLONE_DEST}/xorgxrdp/.git/config
+      (cd $CLONE_DEST/xorgxrdp && git submodule update --init --recursive) >> $BUILD_LOG 2>&1
     else
+      #xrdp
       git clone --resursive ${GH_URL} --branch ${GH_BRANCH} ${CLONE_DEST} >> $BUILD_LOG 2>&1 || error_exit
+      
+      #xorgxrdp
+      git clone --resursive ${GH_XO_URL} --branch ${GH_XO_BRANCH} ${CLONE_DEST}/xorgxrdp >> $BUILD_LOG 2>&1 || error_exit
     fi
     # if commit hash specified, use it
     if [ -n "${GH_COMMIT}" ]; then
@@ -408,7 +425,7 @@ compile_xrdp()
   # cp -r "${BASEDIR}/debian/"patches debian/
   #
   cp COPYING debian/copyright
-  cp readme.txt debian/README
+  cp NEWS.md debian/README
   sed -e "s|%%XRDP_CONFIGURE_ARGS%%|${XRDP_CONFIGURE_ARGS[*]}|g" \
        "${BASEDIR}/debian/rules.in" > debian/rules
   chmod 0755 debian/rules
@@ -439,19 +456,20 @@ bran_new_calculate_version_num()
   clone
   local _PWD=$PWD
   cd ${WRKDIR}/xrdp || error_exit
-  local _XRDP_VERSION=$(grep xrdp readme.txt| head -1 | cut -d ' ' -f 2)
+  local _XRDP_VERSION=$(grep xrdp NEWS.md | head -1 | cut -d ' ' -f 6 | sed 's/[^0-9|\.]//g')
   local _XRDP_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  local _XORGXRDP_VERSION=$(cd xorgxrdp; grep Version README.md | head -1 | cut -d ' ' -f 3 | sed 's/[^0-9|\.]//g')
+  local _XORGXRDP_BRANCH=$(cd xorgxrdp; git rev-parse --abbrev-ref HEAD)
   # hack for git 2.1.x
   # in latest git, this can be written: git log -1 --date=format:%Y%m%d --format="~%cd+git%h" .
-  local _XRDP_DATE_HASH=$(git log -1 --date=short --format="~%cd+git%h" . | tr -d -)
-  local _X11RDP_DATE_HASH=$(git log -1 --date=short --format="~%cd+git%h" xorg/X11R7.6 | tr -d -)
-  #local _XORGXRDP_DATE_HASH=$(cd xorgxrdp; git log -1 --date=short --format="~%cd+git%h" . | tr -d -)
+  local _XRDP_DATE_HASH=$(git log -1 --date=short --format="~%cd+git%h" . | tr -d - | sed 's/~/+/g')
+  local _X11RDP_DATE_HASH=$(git log -1 --date=short --format="~%cd+git%h" xorg/X11R7.6 | tr -d - | sed 's/~/+/g')
+  local _XORGXRDP_DATE_HASH=$(cd xorgxrdp; git log -1 --date=short --format="~%cd+git%h" . | tr -d - | sed 's/~/+/g')
   cd ${_PWD} || error_exit
 
   XRDP_VERSION=${_XRDP_VERSION}${_XRDP_DATE_HASH}+${_XRDP_BRANCH}
   X11RDP_VERSION=${_XRDP_VERSION}${_X11RDP_DATE_HASH}+${_XRDP_BRANCH}
-  #XORGXRDP_VERSION=${_XRDP_VERSION}${_XORGXRDP_DATE_HASH}+${_XRDP_BRANCH}
-  XORGXRDP_VERSION=${XRDP_VERSION}
+  XORGXRDP_VERSION=${_XORGXRDP_VERSION}${_XORGXRDP_DATE_HASH}+${_XORGXRDP_BRANCH}
 
   echo -e "\t" xrdp=${XRDP_VERSION}
   echo -e "\t" x11rdp=${X11RDP_VERSION}

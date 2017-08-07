@@ -6,6 +6,8 @@ DEB_BUILD_MAINT_OPTIONS=hardening=+all
 DPKG_EXPORT_BUILDFLAGS:=1
 include /usr/share/dpkg/default.mk
 
+export PKG_CONFIG_PATH=${CURDIR}/pkgconfig
+
 # this is precisely what dh_auto_configure does
 CONFIGURE_ARGS:=	--build=${DEB_BUILD_GNU_TYPE} \
 			--prefix=/usr \
@@ -18,7 +20,8 @@ CONFIGURE_ARGS:=	--build=${DEB_BUILD_GNU_TYPE} \
 			--libdir=\$${prefix}/lib/${DEB_HOST_MULTIARCH} \
 			--libexecdir=\$${prefix}/lib/${DEB_HOST_MULTIARCH} \
 			--disable-maintainer-mode \
-			--disable-dependency-tracking
+			--disable-dependency-tracking \
+			--with-socketdir=/var/run/xrdp/sockdir
 
 ifneq (${DEB_BUILD_GNU_TYPE},${DEB_HOST_GNU_TYPE})
 CONFIGURE_ARGS+=	--host=${DEB_HOST_GNU_TYPE}
@@ -29,18 +32,37 @@ ifeq (x32,${DEB_HOST_ARCH})
 CONFIGURE_ARGS+=	--without-simd
 endif
 
+ifeq (hurd,${DEB_HOST_ARCH_OS})
+# fuse_lowlevel.h is not yet usable
+CONFIGURE_ARGS+=	--disable-fuse
+endif
+
 %:
-	dh $@ --with systemd
+	dh $@
 
 override_dh_auto_configure:
 	./bootstrap
-	if [ -f librfxcodec/Makefile ]; then : ; fi
-	if [ -f librfxcodec/bootstrap ]; then cd librfxcodec && ./bootstrap && \
-	    ./configure ${CONFIGURE_ARGS} \
-	        --disable-shared \
-	        --enable-static ; fi
-	if [ -f xorgxrdp/bootstrap ]; then  cd xorgxrdp && ./bootstrap && ./configure ${CONFIGURE_ARGS}; fi
-	./configure ${CONFIGURE_ARGS} %%XRDP_CONFIGURE_ARGS%%
+	cd xorgxrdp && ./bootstrap
+	cd librfxcodec && ./bootstrap
+	cd libpainter && ./bootstrap
+	./configure \
+	    --enable-ipv6 \
+	    --enable-jpeg \
+	    --enable-fuse \
+	    --enable-rfxcodec \
+	    --enable-opus \
+	    --enable-painter \
+	    ${CONFIGURE_ARGS} %%XRDP_CONFIGURE_ARGS%%
+	cd xorgxrdp && ./configure \
+	    ${CONFIGURE_ARGS}
+	cd librfxcodec && ./configure \
+	    --disable-shared \
+	    --enable-static \
+	    ${CONFIGURE_ARGS}
+	cd libpainter && ./configure \
+	    --disable-shared \
+	    --enable-static \
+	    ${CONFIGURE_ARGS}
 	find . -name Makefile -print0 | \
 	    xargs -0 perl -pi -e 's!XRDP_PID_PATH.*?/run!$$&/xrdp!g' --
 
@@ -48,16 +70,23 @@ override_dh_auto_install:
 	dh_auto_install -v --destdir=debian/xrdp
 	# remove unused/confusing files
 	rm -f debian/xrdp/etc/xrdp/xrdp.sh
+	rm -f debian/xrdp/etc/xrdp/startwm.sh
 	rm -f debian/xrdp/etc/xrdp/rsakeys.ini
-	# do not install *.la files
-	find debian/xrdp/ -name \*.la -delete
-	# strip library
+	rm -f debian/xrdp/usr/bin/rfxcodectest
+	rm -f debian/xrdp/etc/xrdp/cert.pem
+	rm -f debian/xrdp/etc/xrdp/key.pem
+	# Policy
+	find debian/xrdp/ -name \*.la -print0 | xargs -0 rm -f --
 	find debian/xrdp/usr/lib/ -name \*.a -print0 | \
 	    xargs -0 strip --strip-debug -R .comment --
 	# package split
 	mkdir -p debian/xorgxrdp/etc debian/xorgxrdp/usr/lib
 	mv debian/xrdp/etc/X11 debian/xorgxrdp/etc/
 	mv debian/xrdp/usr/lib/xorg debian/xorgxrdp/usr/lib/
+
+override_dh_installchangelogs:
+	dh_installchangelogs -pxrdp -- NEWS.md
+	dh_installchangelogs --remaining-packages
 
 override_dh_installinit:
 	dh_installinit --no-restart-on-upgrade
@@ -77,3 +106,7 @@ override_dh_gencontrol:
 	    sed 's/, /\n/g' | sort -u | \
 	    perl -0e 'print join(", ", split(/\n/, <>));')"
 	dh_gencontrol
+
+override_dh_clean:
+	dh_clean
+	chmod +x xorgxrdp/tests/xorg-test-run.sh

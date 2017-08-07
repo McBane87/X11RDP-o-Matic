@@ -1,49 +1,31 @@
-# DP: systemd service files for Debian
-
---- a/instfiles/xrdp-sesman.service
-+++ b/instfiles/xrdp-sesman.service
-@@ -1,12 +1,12 @@
- [Unit]
--Description=xrdp session manager
--After=syslog.target network.target
--StopWhenUnneeded=true
--BindTo=xrdp.service
-+Description=xrdp (X Remote Desktop Protocol) session manager
-+Documentation=man:xrdp-sesman(8)  man:sesman.ini(5)
-+Requires=xrdp.service
-+After=network.target xrdp.service
+Subject: Fixes to systemd service files
+From: Dominik George <nik@naturalnet.de>
+Forwarded: https://github.com/neutrinolabs/xrdp/pull/646
+--- a/instfiles/xrdp-sesman.service.in	2017-08-04 22:45:35.434283541 +0200
++++ b/instfiles/xrdp-sesman.service.in	2017-08-04 22:46:43.682007170 +0200
+@@ -7,7 +7,8 @@
  
  [Service]
  Type=forking
--PIDFile=/var/run/xrdp-sesman.pid
+-PIDFile=@localstatedir@/run/xrdp-sesman.pid
 +PIDFile=/run/xrdp/xrdp-sesman.pid
- EnvironmentFile=-/etc/sysconfig/xrdp
- EnvironmentFile=-/etc/default/xrdp
- ExecStart=/usr/sbin/xrdp-sesman $SESMAN_OPTIONS
---- a/instfiles/xrdp.service
-+++ b/instfiles/xrdp.service
-@@ -1,15 +1,20 @@
- [Unit]
--Description=xrdp daemon
--Requires=xrdp-sesman.service
--After=syslog.target network.target xrdp-sesman.service
-+Description=xrdp (X Remote Desktop Protocol) protocol server
-+Documentation=man:xrdp(8) man:xrdp.ini(5)
-+After=network.target
++RuntimeDirectory=xrdp
+ EnvironmentFile=-@sysconfdir@/sysconfig/xrdp
+ EnvironmentFile=-@sysconfdir@/default/xrdp
+ ExecStart=@sbindir@/xrdp-sesman $SESMAN_OPTIONS
+--- a/instfiles/xrdp.service.in	2017-08-04 22:45:35.434283541 +0200
++++ b/instfiles/xrdp.service.in	2017-08-04 22:48:21.853609617 +0200
+@@ -6,9 +6,12 @@
  
  [Service]
  Type=forking
--PIDFile=/var/run/xrdp.pid
+-PIDFile=@localstatedir@/run/xrdp.pid
 +PIDFile=/run/xrdp/xrdp.pid
- EnvironmentFile=-/etc/sysconfig/xrdp
- EnvironmentFile=-/etc/default/xrdp
++RuntimeDirectory=xrdp
+ EnvironmentFile=-@sysconfdir@/sysconfig/xrdp
+ EnvironmentFile=-@sysconfdir@/default/xrdp
 +User=xrdp
 +Group=xrdp
-+PermissionsStartOnly=true
-+ExecStartPre=/bin/sh /usr/share/xrdp/socksetup
- ExecStart=/usr/sbin/xrdp $XRDP_OPTIONS
- ExecStop=/usr/sbin/xrdp $XRDP_OPTIONS --kill
-+ExecStopPost=/bin/rm -rf /var/run/xrdp/sockdir
- 
- [Install]
- WantedBy=multi-user.target
+ PermissionsStartOnly=true
+ ExecStartPre=/bin/sh /usr/share/xrdp/socksetup
+ ExecStart=@sbindir@/xrdp $XRDP_OPTIONS

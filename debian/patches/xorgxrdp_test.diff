@@ -1,0 +1,22 @@
+--- a/xorgxrdp/tests/xorg-test-run.sh	2017-08-04 22:49:42.957281184 +0200
++++ b/xorgxrdp/tests/xorg-test-run.sh	2017-08-04 23:05:48.565597756 +0200
+@@ -57,6 +57,8 @@
+ moduledir="$top_builddir/xrdpkeyb/.libs,$moduledir"
+ moduledir="$top_builddir/xrdpmouse/.libs,$moduledir"
+ 
++if [ $UID -eq 0 ] ; then # root?
++
+ # Run Xorg with compiled modules as a background task
+ $XORG \
+   -modulepath $moduledir \
+@@ -99,3 +101,10 @@
+   echo "Test failed"
+   exit 1
+ fi
++
++else # root?
++
++echo "Test Skipped"
++exit 0
++
++fi # root?

@@ -1,5 +1,11 @@
+asm-librfxcodec.diff
+asm-xorgxrdp.diff
 make-fixes.diff
 config.diff
-systemd.diff
+misc-fixes.diff
 fix_perms.diff
+shutup-daemon.diff
 sockpath.diff
+systemd.diff
+lfs.diff
+xorgxrdp_test.diff

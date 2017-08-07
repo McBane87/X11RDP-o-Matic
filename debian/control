@@ -1,27 +1,50 @@
 Source: xrdp
+Maintainer: Debian Remote Maintainers <pkg-remote-team@lists.alioth.debian.org>
+Uploaders:
+ Dominik George <nik@naturalnet.de>,
+ Andreas Tille <tille@debian.org>,
+ Mike Gabriel <sunweaver@debian.org>,
+ Thorsten Glaser <tg@mirbsd.de>,
 Section: net
 Priority: optional
-Maintainer: System Maintainer <root@your-system>
-Build-Depends: debhelper (>= 8.0.0),
-               autoconf (>=2.59),
-               automake,
-               libfuse-dev,
-               libopus-dev,
-               libpam0g-dev,
-               libssl-dev,
-               libtool,
-               libx11-dev,
-               libxfixes-dev,
-               libxrandr-dev,
-               pkg-config
-Standards-Version: 3.9.4
-Homepage: https://github.com/neutrinolabs/xrdp
+Build-Depends:
+ autoconf (>= 2.59),
+ automake (>= 1.15),
+ debhelper (>= 10),
+ libfuse-dev [!hurd-any],
+ libjpeg-dev,
+ libopus-dev,
+ libpam0g-dev,
+ libssl-dev,
+ libtool,
+ libx11-dev,
+ libxfixes-dev,
+ libxrandr-dev,
+ nasm [amd64 hurd-i386 i386 kfreebsd-amd64 kfreebsd-i386],
+ openssl,
+ pkg-config,
+ systemd [linux-any],
+ x11-utils,
+ xserver-xorg-core,
+ xserver-xorg-dev,
+Standards-Version: 3.9.8
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-remote/xrdp.git
+Vcs-Git: https://anonscm.debian.org/git/pkg-remote/xrdp.git
+Homepage: http://xrdp.sourceforge.net
 
 Package: xrdp
 Architecture: any
-Depends: ${shlibs:Depends},
-         ${misc:Depends},
-         adduser
+Depends:
+ adduser,
+ lsb-base (>= 3.0-6),
+ ssl-cert,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Recommends:
+ fuse [!hurd-any],
+ xorgxrdp,
+Suggests:
+ guacamole,
 Description: Remote Desktop Protocol (RDP) server
  xrdp offers a graphical login to a remote client using
  RDP (the Remote Desktop Protocol). xrdp can connect to
